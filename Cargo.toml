@@ -1,4 +1,4 @@
 [workspace]
-members = ["tmdb-easy-raw"]
+members = ["tmdb-easy","tmdb-easy-raw"]
 
 resolver = "3"
