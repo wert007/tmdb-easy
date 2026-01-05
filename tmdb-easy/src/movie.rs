@@ -5,7 +5,7 @@ use crate::{client::TmdbClient, error::Error};
 pub trait MovieLike {
     fn id(&self) -> u64;
     fn poster_path(&self, client: &TmdbClient) -> Result<String, Error> {
-        todo!();
+        client.movie_details(self.id()).map(|m| m.poster_path)
     }
 }
 
@@ -24,6 +24,16 @@ impl MovieLike for tmdb_easy_raw::types::SearchMovieResponse200Results {
     }
 
     fn poster_path(&self, _: &TmdbClient) -> Result<String, Error> {
+        Ok(self.poster_path.clone())
+    }
+}
+
+impl MovieLike for tmdb_easy_raw::types::MovieDetailsResponse200 {
+    fn id(&self) -> u64 {
+        self.id as _
+    }
+
+    fn poster_path(&self, _client: &TmdbClient) -> Result<String, Error> {
         Ok(self.poster_path.clone())
     }
 }

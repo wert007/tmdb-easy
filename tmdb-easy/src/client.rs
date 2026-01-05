@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use tmdb_easy_raw::types::ConfigurationDetailsResponse200;
+use tmdb_easy_raw::types::{ConfigurationDetailsResponse200, MovieDetailsResponse200};
 
 use crate::{error::Error, search::movie::SearchMovieBuilder};
 
@@ -60,5 +60,13 @@ impl TmdbClient {
             .decode()
             .map_err(|_| Error::DecodingError)?;
         Ok(img)
+    }
+
+    pub(crate) fn movie_details(&self, movie_id: u64) -> Result<MovieDetailsResponse200, Error> {
+        Ok(tmdb_easy_raw::parametrized_functions::movie_details(
+            &self.client,
+            &self.api_key,
+            movie_id as _,
+        )?)
     }
 }

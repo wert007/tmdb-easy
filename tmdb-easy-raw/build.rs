@@ -39,7 +39,10 @@ impl TypeDefinition {
                     let mut field_types =
                         TypeDefinition::from_type_schema(field_type, combine(&name, field_name));
                     if field_types.is_empty() {
-                        return Vec::new();
+                        // WARN: This means we are skipping fields. but those
+                        // are also very much not defined. so. should be ok for
+                        // now.
+                        continue;
                     }
                     let field_name = field_name
                         .replace('.', "_")
