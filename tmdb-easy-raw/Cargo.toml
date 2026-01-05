@@ -12,6 +12,8 @@ async = []
 [dependencies]
 reqwest = { version = "0.13.1", features = ["blocking", "json", "query"] }
 serde = { version = "1.0.228", features = ["derive"] }
+thiserror = "2.0.17"
+serde_json = "1.0.148"
 
 [build-dependencies]
 serde = { version = "1.0.228", features = ["derive"] }

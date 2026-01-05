@@ -145,7 +145,7 @@ where
         &schema,
         &FunctionDefinitionArgs {
             is_async: false,
-            client_parameter: "client: reqwest::blocking::Client".into(),
+            client_parameter: "client: &reqwest::blocking::Client".into(),
             base_url: schema.servers.0[0].url.clone(),
         },
     );
@@ -158,11 +158,11 @@ where
             writeln!(w, "{}", f.doc_comment).unwrap();
             writeln!(w, "#[inline]").unwrap();
             write!(w, "pub fn {}(", f.name).unwrap();
-            write!(w, "client: reqwest::blocking::Client, api_key: &str, ").unwrap();
+            write!(w, "client: &reqwest::blocking::Client, api_key: &str, ").unwrap();
             for p in &f.parameters {
                 write!(w, "{}: {}, ", p.name, p.type_).unwrap();
             }
-            writeln!(w, ") -> {} {{", f.response).unwrap();
+            writeln!(w, ") -> Result<{}, crate::Error> {{", f.response).unwrap();
             writeln!(w, "{}", f.body).unwrap();
             writeln!(w, "}}").unwrap();
         }
@@ -181,7 +181,7 @@ where
             writeln!(w, "{}", f.doc_comment).unwrap();
             writeln!(w, "#[inline]").unwrap();
             write!(w, "pub fn {}(", f.name).unwrap();
-            write!(w, "client: reqwest::blocking::Client, api_key: &str, ").unwrap();
+            write!(w, "client: &reqwest::blocking::Client, api_key: &str, ").unwrap();
             let mut has_optional_fields = false;
             for p in &f.parameters {
                 if p.is_required {
@@ -191,7 +191,7 @@ where
                 }
             }
             if has_optional_fields {
-                writeln!(w, ") -> {} {{", f.response).unwrap();
+                writeln!(w, ") -> Result<{}, crate::Error> {{", f.response).unwrap();
                 writeln!(w, "    {}_with_parameter(client, api_key,", f.name).unwrap();
                 for p in &f.parameters {
                     if p.is_required {
@@ -202,7 +202,7 @@ where
                 writeln!(w, "{}", f.doc_comment).unwrap();
                 writeln!(w, "#[inline]").unwrap();
                 write!(w, "pub fn {}_with_parameter(", f.name).unwrap();
-                write!(w, "client: reqwest::blocking::Client, api_key: &str, ").unwrap();
+                write!(w, "client: &reqwest::blocking::Client, api_key: &str, ").unwrap();
                 for p in &f.parameters {
                     if p.is_required {
                         write!(w, "{}: {}, ", p.name, p.type_).unwrap();
@@ -211,7 +211,7 @@ where
 
                 write!(w, "remaining: {parameter_name}",).unwrap();
             }
-            writeln!(w, ") -> {} {{", f.response).unwrap();
+            writeln!(w, ") -> Result<{}, crate::Error> {{", f.response).unwrap();
             if has_optional_fields {
                 writeln!(w, "    let {parameter_name} {{").unwrap();
                 for p in &f.parameters {
@@ -240,7 +240,7 @@ where
         &schema,
         &FunctionDefinitionArgs {
             is_async: true,
-            client_parameter: "client: reqwest::Client".into(),
+            client_parameter: "client: &reqwest::Client".into(),
             base_url: schema.servers.0[0].url.clone(),
         },
     );
@@ -253,11 +253,11 @@ where
             writeln!(w, "{}", f.doc_comment).unwrap();
             writeln!(w, "#[inline]").unwrap();
             write!(w, "pub async fn {}(", f.name).unwrap();
-            write!(w, "client: reqwest::Client, api_key: &str, ").unwrap();
+            write!(w, "client: &reqwest::Client, api_key: &str, ").unwrap();
             for p in &f.parameters {
                 write!(w, "{}: {}, ", p.name, p.type_).unwrap();
             }
-            writeln!(w, ") -> {} {{", f.response).unwrap();
+            writeln!(w, ") -> Result<{}, crate::Error> {{", f.response).unwrap();
             writeln!(w, "{}", f.body).unwrap();
             writeln!(w, "}}").unwrap();
         }
@@ -280,7 +280,7 @@ where
             writeln!(w, "{}", f.doc_comment).unwrap();
             writeln!(w, "#[inline]").unwrap();
             write!(w, "pub async fn {}(", f.name).unwrap();
-            write!(w, "client: reqwest::Client, api_key: &str, ").unwrap();
+            write!(w, "client: &reqwest::Client, api_key: &str, ").unwrap();
             let mut has_optional_fields = false;
             for p in &f.parameters {
                 if p.is_required {
@@ -290,7 +290,7 @@ where
                 }
             }
             if has_optional_fields {
-                writeln!(w, ") -> {} {{", f.response).unwrap();
+                writeln!(w, ") -> Result<{}, crate::Error> {{", f.response).unwrap();
                 writeln!(w, "    {}_with_parameter(client, api_key,", f.name).unwrap();
                 for p in &f.parameters {
                     if p.is_required {
@@ -301,7 +301,7 @@ where
                 writeln!(w, "{}", f.doc_comment).unwrap();
                 writeln!(w, "#[inline]").unwrap();
                 write!(w, "pub async fn {}_with_parameter(", f.name).unwrap();
-                write!(w, "client: reqwest::Client, api_key: &str, ").unwrap();
+                write!(w, "client: &reqwest::Client, api_key: &str, ").unwrap();
                 for p in &f.parameters {
                     if p.is_required {
                         write!(w, "{}: {}, ", p.name, p.type_).unwrap();
@@ -310,7 +310,7 @@ where
 
                 write!(w, "remaining: {parameter_name}",).unwrap();
             }
-            writeln!(w, ") -> {} {{", f.response).unwrap();
+            writeln!(w, ") -> Result<{}, crate::Error> {{", f.response).unwrap();
             if has_optional_fields {
                 writeln!(w, "    let {parameter_name} {{").unwrap();
                 for p in &f.parameters {
@@ -527,13 +527,26 @@ fn collect_functions_in_path_route(
             writeln!(body, "    }}").unwrap();
         }
     }
+    let r#await = if fun.is_async { ".await" } else { "" };
     writeln!(
         body,
-        "    r.send(){}.expect(\"TODO\").json(){}.unwrap()",
-        if fun.is_async { ".await" } else { "" },
-        if fun.is_async { ".await" } else { "" },
+        "    let r = r.build().map_err(|e| crate::Error::without_context(e))?;"
     )
     .unwrap();
+    writeln!(body, "    let url = r.url().clone();").unwrap();
+    writeln!(
+        body,
+        "    let r = client.execute(r){await}.map_err(|e| crate::Error::new_with_url(&url, e))?;"
+    )
+    .unwrap();
+    writeln!(body, "    let status = r.status();").unwrap();
+    writeln!(
+        body,
+        "    let text = r.text(){await}.map_err(|e| crate::Error::new(&url, status, e))?;"
+    )
+    .unwrap();
+    writeln!(body, "    let result = serde_json::from_str(&text).map_err(|e| crate::Error::new_with_text(&url, status, &text, e))?;").unwrap();
+    writeln!(body, "    Ok(result)",).unwrap();
     let doc_comment = format!("/// {}\n///\n/// {}", get.summary, get.description);
     result.push(FunctionDefinition {
         name,
