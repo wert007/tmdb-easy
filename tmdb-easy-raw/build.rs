@@ -20,6 +20,7 @@ struct FunctionDefinition {
 
 struct TypeDefinition {
     name: String,
+    ref_name: String,
     definition: Option<String>,
 }
 impl TypeDefinition {
@@ -63,30 +64,35 @@ impl TypeDefinition {
                 }
                 writeln!(definition, "}}").unwrap();
                 result.push(TypeDefinition {
+                    ref_name: name.clone(),
                     name,
                     definition: Some(definition),
                 });
             }
             schema::TaggedTypeSchema::Boolean { .. } => {
                 result.push(Self {
+                    ref_name: "bool".into(),
                     name: "bool".into(),
                     definition: None,
                 });
             }
             schema::TaggedTypeSchema::String { .. } => {
                 result.push(Self {
+                    ref_name: "&str".into(),
                     name: "String".into(),
                     definition: None,
                 });
             }
             schema::TaggedTypeSchema::Integer { .. } => {
                 result.push(Self {
+                    ref_name: "i64".into(),
                     name: "i64".into(),
                     definition: None,
                 });
             }
             schema::TaggedTypeSchema::Number { .. } => {
                 result.push(Self {
+                    ref_name: "f64".into(),
                     name: "f64".into(),
                     definition: None,
                 });
@@ -98,6 +104,7 @@ impl TypeDefinition {
                 }
                 result.append(&mut items);
                 result.push(Self {
+                    ref_name: format!("&[{}]", result.last().unwrap().name),
                     name: format!("Vec<{}>", result.last().unwrap().name),
                     definition: None,
                 });
@@ -230,7 +237,17 @@ where
             )
             .unwrap();
             for p in &f.parameters {
-                writeln!(w, "        {},", p.name).unwrap();
+                writeln!(
+                    w,
+                    "        {}{},",
+                    p.name,
+                    if !p.is_required && p.type_.contains("&str") {
+                        ".as_deref()"
+                    } else {
+                        ""
+                    }
+                )
+                .unwrap();
             }
             writeln!(w, "    )").unwrap();
             writeln!(w, "}}").unwrap();
@@ -370,7 +387,16 @@ fn collect_parameter_types_in_path_route(
 ) {
     use std::fmt::Write;
     let name = name.to_case(convert_case::Case::Pascal);
-    let mut definition = format!("pub struct {name}Parameter {{\n");
+    let needs_references = get
+        .parameters
+        .iter()
+        .filter(|p| !p.required)
+        .filter_map(|p| TypeDefinition::from_type_schema(&p.schema, String::new()).pop())
+        .any(|t| t.name == "String");
+    let mut definition = format!(
+        "pub struct {name}Parameter{} {{\n",
+        if needs_references { "<'a>" } else { "" }
+    );
     let mut has_fields = false;
     for p in get.parameters.iter().filter(|p| !p.required) {
         has_fields = true;
@@ -391,16 +417,21 @@ fn collect_parameter_types_in_path_route(
             writeln!(definition, "    /// {description}").unwrap();
         }
         writeln!(definition, "    #[serde(default)]").unwrap();
+        let field_ref_name = field_types.last().unwrap().ref_name.clone();
         writeln!(
             definition,
             "    pub {field_name}: Option<{}>,",
-            field_types.last().unwrap().name
+            field_ref_name
+                .strip_prefix('&')
+                .map(|t| format!("std::borrow::Cow<'a, {t}>"))
+                .unwrap_or(field_ref_name),
         )
         .unwrap();
     }
     writeln!(definition, "}}").unwrap();
     if has_fields {
         result.push(TypeDefinition {
+            ref_name: name.clone(),
             name,
             definition: Some(definition),
         });
@@ -469,9 +500,9 @@ fn collect_functions_in_path_route(
         parameters.push(FunctionParameter {
             name,
             type_: if p.required {
-                type_.name
+                type_.ref_name
             } else {
-                format!("Option<{}>", type_.name)
+                format!("Option<{}>", type_.ref_name)
             },
             is_required: p.required,
         });
@@ -517,10 +548,18 @@ fn collect_functions_in_path_route(
         if !p.required {
             writeln!(body, "    if let Some({name}) = {name} {{",).unwrap();
         }
+        let to_string_necessary = TypeDefinition::from_type_schema(&p.schema, String::new())
+            .last()
+            .is_some_and(|t| t.name != "String");
         writeln!(
             body,
-            "        r = r.query(&[(\"{}\".to_string(), {name}.to_string())]);",
-            p.name
+            "        r = r.query(&[(\"{}\", {name}{})]);",
+            p.name,
+            if to_string_necessary {
+                ".to_string()"
+            } else {
+                ""
+            },
         )
         .unwrap();
         if !p.required {
