@@ -1,6 +1,8 @@
 use std::{borrow::Cow, ops::Index};
 
-use crate::client::TmdbClient;
+use tmdb_easy_raw::types::SearchMovieResponse200Results;
+
+use crate::{client::TmdbClient, error::Error};
 
 pub struct SearchMovieResponse<'a> {
     builder: SearchMovieBuilder<'a>,
@@ -16,8 +18,11 @@ impl<'a> Index<usize> for SearchMovieResponse<'a> {
 }
 
 impl<'a> SearchMovieResponse<'a> {
+    pub fn current_page(&self) -> &[SearchMovieResponse200Results] {
+        &self.results.results
+    }
     // pub fn all_results(self) -> Result<Vec
-    pub fn next_page(self) -> Option<Result<Self, tmdb_easy_raw::Error>> {
+    pub fn next_page(self) -> Option<Result<Self, Error>> {
         if self.results.page >= self.results.total_pages {
             None
         } else {
@@ -56,16 +61,18 @@ impl<'a> SearchMovieBuilder<'a> {
         self
     }
 
-    pub fn search(self) -> Result<SearchMovieResponse<'a>, tmdb_easy_raw::Error> {
-        tmdb_easy_raw::parametrized_functions::search_movie_with_parameter(
-            &self.client.client,
-            self.client.api_key.as_ref(),
-            &self.query,
-            self.parameters.clone(),
+    pub fn search(self) -> Result<SearchMovieResponse<'a>, Error> {
+        Ok(
+            tmdb_easy_raw::parametrized_functions::search_movie_with_parameter(
+                &self.client.client,
+                self.client.api_key.as_ref(),
+                &self.query,
+                self.parameters.clone(),
+            )
+            .map(|results| SearchMovieResponse {
+                builder: self,
+                results,
+            })?,
         )
-        .map(|results| SearchMovieResponse {
-            builder: self,
-            results,
-        })
     }
 }
