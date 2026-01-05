@@ -1850,6 +1850,7 @@ version = "0.1.0"
 dependencies = [
  "image",
  "reqwest",
+ "thiserror 2.0.17",
  "tmdb-easy-raw",
 ]
 

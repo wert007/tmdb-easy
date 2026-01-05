@@ -498,6 +498,7 @@ fn collect_functions_in_path_route(
         let Some(type_) =
             TypeDefinition::from_type_schema(&p.schema, combine(&namespace, &name)).pop()
         else {
+            eprintln!("Failing on {name}");
             return;
         };
         parameters.push(FunctionParameter {
@@ -519,6 +520,7 @@ fn collect_functions_in_path_route(
             combine(&namespace, format!("Response{response_kind}")),
         )
         .pop() else {
+            eprintln!("Failing on {name} because of return type!");
             return;
         };
 

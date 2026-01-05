@@ -9,3 +9,4 @@ reqwest = { version = "0.13.1", features = ["blocking"] }
 tmdb-easy-raw = { version = "0.1.0", path = "../tmdb-easy-raw", features = [
     "blocking",
 ] }
+thiserror = "2.0.17"
