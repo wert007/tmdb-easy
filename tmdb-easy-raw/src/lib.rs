@@ -62,70 +62,18 @@ pub struct Error {
     pub kind: ErrorKind,
 }
 
-impl Error {
-    pub fn without_context(kind: impl Into<ErrorKind>) -> Self {
-        Self {
-            context: ErrorContext {
-                url: None,
-                response_status: None,
-                response_text: None,
-            },
-            kind: kind.into(),
-        }
-    }
-    pub fn new_with_url(url: &reqwest::Url, kind: impl Into<ErrorKind>) -> Self {
-        Self {
-            context: ErrorContext {
-                url: Some(url.clone()),
-                response_status: None,
-                response_text: None,
-            },
-            kind: kind.into(),
-        }
-    }
-    pub fn new(
-        url: &reqwest::Url,
-        response_status: reqwest::StatusCode,
-        kind: impl Into<ErrorKind>,
-    ) -> Self {
-        Self {
-            context: ErrorContext {
-                url: Some(url.clone()),
-                response_status: Some(response_status),
-                response_text: None,
-            },
-            kind: kind.into(),
-        }
-    }
-
-    pub fn new_with_text(
-        url: &reqwest::Url,
-        response_status: reqwest::StatusCode,
-        text: &str,
-        kind: impl Into<ErrorKind>,
-    ) -> Self {
-        Self {
-            context: ErrorContext {
-                url: Some(url.clone()),
-                response_status: Some(response_status),
-                response_text: Some(text.into()),
-            },
-            kind: kind.into(),
-        }
-    }
-}
-
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.kind)
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ErrorContext {
+    pub source: &'static str,
     pub url: Option<reqwest::Url>,
-    pub response_status: Option<reqwest::StatusCode>,
-    pub response_text: Option<String>,
+    pub status: Option<reqwest::StatusCode>,
+    pub text: Option<String>,
 }
 
 #[derive(thiserror::Error, Debug)]

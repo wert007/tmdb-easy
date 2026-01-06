@@ -1,24 +1,24 @@
 use std::{borrow::Cow, ops::Index};
 
-use tmdb_easy_raw::types::SearchMovieResponse200Results;
+use tmdb_easy_raw::types::SearchTvResponse200Results;
 
 use crate::{client::TmdbClient, error::Error};
 
-pub struct SearchMovieResponse<'a> {
-    builder: SearchMovieBuilder<'a>,
-    results: tmdb_easy_raw::types::SearchMovieResponse200,
+pub struct SearchTvResponse<'a> {
+    builder: SearchTvBuilder<'a>,
+    results: tmdb_easy_raw::types::SearchTvResponse200,
 }
 
-impl<'a> Index<usize> for SearchMovieResponse<'a> {
-    type Output = tmdb_easy_raw::types::SearchMovieResponse200Results;
+impl<'a> Index<usize> for SearchTvResponse<'a> {
+    type Output = tmdb_easy_raw::types::SearchTvResponse200Results;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.results.results[index]
     }
 }
 
-impl<'a> SearchMovieResponse<'a> {
-    pub fn current_page(&self) -> &[SearchMovieResponse200Results] {
+impl<'a> SearchTvResponse<'a> {
+    pub fn current_page(&self) -> &[SearchTvResponse200Results] {
         &self.results.results
     }
     // pub fn all_results(self) -> Result<Vec
@@ -31,13 +31,13 @@ impl<'a> SearchMovieResponse<'a> {
     }
 }
 
-pub struct SearchMovieBuilder<'a> {
+pub struct SearchTvBuilder<'a> {
     client: &'a TmdbClient,
     query: Cow<'a, str>,
-    parameters: tmdb_easy_raw::parameter_types::SearchMovieParameter<'a>,
+    parameters: tmdb_easy_raw::parameter_types::SearchTvParameter<'a>,
 }
 
-impl<'a> SearchMovieBuilder<'a> {
+impl<'a> SearchTvBuilder<'a> {
     pub fn new(client: &'a TmdbClient, query: impl Into<Cow<'a, str>>) -> Self {
         Self {
             client,
@@ -47,7 +47,7 @@ impl<'a> SearchMovieBuilder<'a> {
     }
 
     pub fn with_year(mut self, year: u16) -> Self {
-        self.parameters.year = Some(year.to_string().into());
+        self.parameters.year = Some(year.into());
         self
     }
 
@@ -61,14 +61,14 @@ impl<'a> SearchMovieBuilder<'a> {
         self
     }
 
-    pub fn search(self) -> Result<SearchMovieResponse<'a>, Error> {
-        match tmdb_easy_raw::parametrized_functions::search_movie_with_parameter(
+    pub fn search(self) -> Result<SearchTvResponse<'a>, Error> {
+        match tmdb_easy_raw::parametrized_functions::search_tv_with_parameter(
             &self.client.client,
             self.client.api_key.as_ref(),
             &self.query,
             self.parameters.clone(),
         ) {
-            Ok(it) => Ok(SearchMovieResponse {
+            Ok(it) => Ok(SearchTvResponse {
                 builder: self,
                 results: it,
             }),

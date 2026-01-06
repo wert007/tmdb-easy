@@ -155,7 +155,6 @@ where
         &schema,
         &FunctionDefinitionArgs {
             is_async: false,
-            client_parameter: "client: &reqwest::blocking::Client".into(),
             base_url: schema.servers.0[0].url.clone(),
         },
     );
@@ -260,7 +259,6 @@ where
         &schema,
         &FunctionDefinitionArgs {
             is_async: true,
-            client_parameter: "client: &reqwest::Client".into(),
             base_url: schema.servers.0[0].url.clone(),
         },
     );
@@ -443,7 +441,6 @@ fn collect_parameter_types_in_path_route(
 
 struct FunctionDefinitionArgs {
     is_async: bool,
-    client_parameter: String,
     base_url: String,
 }
 
@@ -541,6 +538,7 @@ fn collect_functions_in_path_route(
     };
     let mut body = String::new();
     let query_parameters = get.parameters.iter().filter(|p| p.r#in.query()).peekable();
+    writeln!(body, "    let source = \"{}{path}\";", fun.base_url).unwrap();
     writeln!(
         body,
         "    let mut r = client.{request_function_name}(format!(\"{}{path}\"));",
@@ -574,22 +572,22 @@ fn collect_functions_in_path_route(
     let r#await = if fun.is_async { ".await" } else { "" };
     writeln!(
         body,
-        "    let r = r.build().map_err(|e| crate::Error::without_context(e))?;"
+        "    let r = r.build().map_err(|e| crate::Error {{kind: e.into(), context: crate::ErrorContext {{source, ..Default::default()}}}})?;"
     )
     .unwrap();
     writeln!(body, "    let url = r.url().clone();").unwrap();
     writeln!(
         body,
-        "    let r = client.execute(r){await}.map_err(|e| crate::Error::new_with_url(&url, e))?;"
+        "    let r = client.execute(r){await}.map_err(|e| crate::Error {{kind: e.into(), context: crate::ErrorContext {{source, url: Some(url.clone()), ..Default::default()}}}})?;"
     )
     .unwrap();
     writeln!(body, "    let status = r.status();").unwrap();
     writeln!(
         body,
-        "    let text = r.text(){await}.map_err(|e| crate::Error::new(&url, status, e))?;"
+        "    let text = r.text(){await}.map_err(|e| crate::Error {{kind: e.into(), context: crate::ErrorContext {{source, url: Some(url.clone()), status: Some(status), ..Default::default()}}}})?;"
     )
     .unwrap();
-    writeln!(body, "    let result = serde_json::from_str(&text).map_err(|e| crate::Error::new_with_text(&url, status, &text, e))?;").unwrap();
+    writeln!(body, "    let result = serde_json::from_str(&text).map_err(|e| crate::Error {{kind: e.into(), context: crate::ErrorContext {{source, url: Some(url.clone()), status: Some(status), text: Some(text.clone()), ..Default::default()}}}})?;").unwrap();
     writeln!(body, "    Ok(result)",).unwrap();
     let doc_comment = format!("/// {}\n///\n/// {}", get.summary, get.description);
     result.push(FunctionDefinition {
@@ -603,7 +601,7 @@ fn collect_functions_in_path_route(
 
 fn collect_types_for(schema: &schema::Schema) -> Vec<TypeDefinition> {
     let mut result = Vec::new();
-    for (path, schema) in &schema.paths {
+    for (_path, schema) in &schema.paths {
         if let Some(get) = &schema.get {
             collect_types_in_path_route(get, &mut result, get.operation_id.clone());
         }
@@ -638,51 +636,5 @@ fn combine(namespace: &str, name: impl Into<String>) -> String {
         name
     } else {
         format!("{namespace}_{name}")
-    }
-}
-
-fn handle_path_route(path: String, path_route: schema::PathRoute) {
-    println!("{path}:");
-    print!("fn {}(", path_route.operation_id.replace('-', "_"));
-    for parameter in path_route.parameters {}
-    print!(") -> ");
-    for (status, response) in path_route.responses {
-        for (type_, content) in response.content {
-            // handle_schema(content.schema);
-        }
-    }
-    println!();
-}
-
-fn handle_schema(schema: schema::TypeSchema) {
-    match schema {
-        schema::TypeSchema::Tagged(tagged_type_schema) => {
-            handle_type_schema(tagged_type_schema);
-        }
-        schema::TypeSchema::Empty(hash_map) => print!("$$$Unknown"),
-    }
-}
-
-fn handle_type_schema(type_schema: schema::TaggedTypeSchema) {
-    match type_schema {
-        schema::TaggedTypeSchema::Object { properties } => {
-            println!();
-            println!("struct $$$NoName?");
-            for (field, field_t) in properties {
-                println!("   {field}: ");
-                handle_schema(field_t);
-                println!(",");
-            }
-        }
-        schema::TaggedTypeSchema::Boolean { default } => print!("bool"),
-        schema::TaggedTypeSchema::String { default } => print!("string"),
-        schema::TaggedTypeSchema::Integer { default } => print!("i64"),
-        schema::TaggedTypeSchema::Number { default } => print!("f64"),
-        schema::TaggedTypeSchema::Array { items } => {
-            println!("Vec<");
-            handle_schema(*items);
-            println!(">");
-        }
-        schema::TaggedTypeSchema::Empty => unreachable!(),
     }
 }

@@ -2,7 +2,11 @@ use std::borrow::Cow;
 
 use tmdb_easy_raw::types::{ConfigurationDetailsResponse200, MovieDetailsResponse200};
 
-use crate::{error::Error, search::movie::SearchMovieBuilder};
+use crate::{
+    error::{Error, ErrorKind},
+    search::movie::SearchMovieBuilder,
+    search::tv_show::SearchTvBuilder,
+};
 
 pub struct TmdbClient {
     pub(crate) client: reqwest::blocking::Client,
@@ -24,6 +28,13 @@ impl TmdbClient {
         name: impl Into<Cow<'b, str>>,
     ) -> SearchMovieBuilder<'a> {
         SearchMovieBuilder::new(self, name.into())
+    }
+
+    pub fn search_for_tv<'a, 'b: 'a>(
+        &'a self,
+        name: impl Into<Cow<'b, str>>,
+    ) -> SearchTvBuilder<'a> {
+        SearchTvBuilder::new(self, name.into())
     }
 
     pub fn configuration_details(&mut self) -> Result<&ConfigurationDetailsResponse200, Error> {
@@ -51,14 +62,26 @@ impl TmdbClient {
                 .expect("at least one size?"),
             poster_path
         ))
-        .map_err(|_| Error::NetworkError)?
+        .map_err(|e| Error {
+            source: "tmdb api poster_path",
+            error: ErrorKind::NetworkError(e.status().unwrap_or_default(), e.to_string()),
+        })?
         .bytes()
-        .map_err(|_| Error::NetworkError)?;
+        .map_err(|e| Error {
+            source: "tmdb api poster_path",
+            error: ErrorKind::NetworkError(e.status().unwrap_or_default(), e.to_string()),
+        })?;
         let img = image::ImageReader::new(std::io::Cursor::new(bytes))
             .with_guessed_format()
-            .map_err(|_| Error::DecodingError)?
+            .map_err(|_| Error {
+                source: "tmdb api poster_path",
+                error: ErrorKind::DecodingError,
+            })?
             .decode()
-            .map_err(|_| Error::DecodingError)?;
+            .map_err(|_| Error {
+                source: "tmdb api poster_path",
+                error: ErrorKind::DecodingError,
+            })?;
         Ok(img)
     }
 
