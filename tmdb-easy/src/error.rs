@@ -14,6 +14,8 @@ impl Display for Error {
     }
 }
 
+impl std::error::Error for Error {}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ErrorKind {
     #[error("Network error: StatusCode {0}: {1}")]
