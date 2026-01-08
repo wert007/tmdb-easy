@@ -29,3 +29,5 @@ impl MovieOrTvLike for SearchTvResponse200Results {
         Ok(self.poster_path.clone())
     }
 }
+
+impl TvLike for SearchTvResponse200Results {}
